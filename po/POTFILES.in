@@ -1,0 +1,3 @@
+# List of source files containing translatable strings.
+# (src/main.rs was removed — add installer source files here when strings are added.)
+src/main.rs

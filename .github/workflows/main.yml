@@ -1,0 +1,66 @@
+# .github/workflows/build.yml
+name: Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          release: true
+          install: >-
+            mingw-w64-ucrt-x86_64-rust
+            mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-vulkan-loader
+            mingw-w64-ucrt-x86_64-libadwaita
+            mingw-w64-ucrt-x86_64-librsvg
+            mingw-w64-ucrt-x86_64-gettext-tools
+            make
+            zip
+        env:
+          MSYS2_PATH_TYPE: inherit
+
+      - name: Cache Cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: windows-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - name: Package
+        run: make package-windows
+
+      - name: Upload portable zip
+        uses: actions/upload-artifact@v7
+        with:
+          name: gtkwininstaller-windows-portable
+          path: dist/gtkwininstaller-windows.zip
+          compression-level: 0
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: gtkwininstaller-windows-installer
+          path: dist/gtkwininstaller-setup.exe
+          compression-level: 0
