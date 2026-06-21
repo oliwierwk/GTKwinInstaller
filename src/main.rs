@@ -88,11 +88,7 @@ mod windows {
             let _ = key.set_value("DisplayName", &APP_NAME);
             let _ = key.set_value("Publisher", &PUBLISHER);
             let _ = key.set_value("InstallLocation", &dest.to_string_lossy().as_ref());
-            let uninstall_exe = if BUNDLED_UNINSTALLER {
-                dest.join("uninstall.exe")
-            } else {
-                dest.join(exe_name())
-            };
+            let uninstall_exe = dest.join("uninstaller.exe");
             let _ = key.set_value("DisplayIcon",     &uninstall_exe.to_string_lossy().as_ref());
             let _ = key.set_value("UninstallString", &uninstall_exe.to_string_lossy().as_ref());
             let _ = key.set_value("NoModify", &1u32);
@@ -202,7 +198,7 @@ mod windows {
         if BUNDLED_UNINSTALLER {
             copy_dir(&src.join("app"), dest)?;
             if let Ok(setup_path) = std::env::var("SETUP_EXE_PATH") {
-                let _ = std::fs::copy(setup_path, dest.join("uninstall.exe"));
+                let _ = std::fs::copy(setup_path, dest.join("uninstaller.exe"));
             }
         } else {
             // Copy the full installer directory (DLLs, installer binary, app/) to dest,
@@ -214,6 +210,7 @@ mod windows {
                 std::fs::rename(entry.path(), dest.join(entry.file_name()))?;
             }
             std::fs::remove_dir(&app_dir)?;
+            std::fs::rename(dest.join(exe_name()), dest.join("uninstaller.exe"))?;
         }
         write_registry(dest);
         let exe = dest.join(exe_name());
@@ -329,8 +326,11 @@ mod windows {
             let tv = TextView::builder()
                 .editable(false)
                 .wrap_mode(WrapMode::Word)
-                .monospace(true)
                 .vexpand(true)
+                .left_margin(8)
+                .right_margin(8)
+                .top_margin(8)
+                .bottom_margin(8)
                 .build();
             tv.buffer().set_text(text);
 
