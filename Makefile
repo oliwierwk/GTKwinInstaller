@@ -12,10 +12,10 @@ SETUP_EXE := dist/gtkwininstaller-setup.exe
 INSTALLER_ENV ?= installer.env
 -include $(INSTALLER_ENV)
 
-APP_DIR    ?= app        # payload directory — contents go to the install destination
-ASSETS_DIR ?= assets     # installer branding assets (SVGs/PNGs)
+APP_DIR    ?= app
+ASSETS_DIR ?= assets
 LICENSE    ?= app/LICENSE
-APP_BUILD  ?=            # optional command to build the app before staging
+APP_BUILD  ?=
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Branding forwarded into cargo builds as env vars (only set if non-empty)

@@ -27,7 +27,8 @@ Requires MSYS2 with the UCRT64 toolchain.
 ## Use as a git submodule
 
 Embed this repo as a submodule so your project gets installer updates without
-forking. Configuration is injected from outside — the submodule stays pristine.
+forking. Configuration is injected from a parent-side file — no tracked files
+inside the submodule need to be edited.
 
 ```bash
 # In your project root
@@ -35,7 +36,7 @@ git submodule add https://github.com/youruser/GTKwinInstaller installer
 cp installer/installer.env.example installer.env
 ```
 
-Edit `installer.env` (it lives in your repo, not in the submodule):
+Edit `installer.env` (lives in your repo, not in the submodule):
 
 ```ini
 APP_NAME=My App
@@ -51,8 +52,6 @@ Then build:
 ```bash
 make -C installer package-windows INSTALLER_ENV=../installer.env
 ```
-
-`git status` inside `installer/` will always be clean.
 
 ## Translations
 
