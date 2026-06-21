@@ -19,8 +19,7 @@ mod windows {
     use gtk4::{
         ApplicationWindow, Box as GtkBox, Button, CheckButton, Entry, FileDialog,
         HeaderBar, Image, Label, Orientation, ScrolledWindow, Separator, Stack,
-        StackTransitionType, AlertDialog, TextView, WrapMode, gio, glib,
-        gdk_pixbuf,
+        StackTransitionType, AlertDialog, TextView, WrapMode, gio, glib, gdk,
     };
     use libadwaita as adw;
     use gettextrs::gettext;
@@ -34,6 +33,13 @@ mod windows {
         let _ = bindtextdomain("gtkwininstaller", exe_dir.join("share/locale"));
         let _ = bind_textdomain_codeset("gtkwininstaller", "UTF-8");
         let _ = textdomain("gtkwininstaller");
+    }
+
+    fn is_uninstaller() -> bool {
+        std::env::current_exe()
+            .ok()
+            .and_then(|p| p.file_name().map(|n| n == std::ffi::OsStr::new("uninstaller.exe")))
+            .unwrap_or(false)
     }
 
     fn setup_env(exe_dir: &Path) {
@@ -241,13 +247,29 @@ mod windows {
             .unwrap_or_else(|| assets.join(format!("{stem}.svg")))
     }
 
+    fn svg_to_texture(path: &std::path::Path, size: i32) -> Option<gdk::Texture> {
+        let data = std::fs::read(path).ok()?;
+        let tree = resvg::usvg::Tree::from_data(&data, &resvg::usvg::Options::default()).ok()?;
+        let size = size.max(1) as u32;
+        let mut pixmap = resvg::tiny_skia::Pixmap::new(size, size)?;
+        let ts = tree.size();
+        let sx = size as f32 / ts.width();
+        let sy = size as f32 / ts.height();
+        resvg::render(&tree, resvg::tiny_skia::Transform::from_scale(sx, sy), &mut pixmap.as_mut());
+        let bytes = glib::Bytes::from(pixmap.data());
+        Some(gdk::MemoryTexture::new(size as i32, size as i32, gdk::MemoryFormat::R8g8b8a8Premultiplied, &bytes, (size * 4) as usize).upcast())
+    }
+
     fn set_asset_image(image: &Image, assets: &std::path::Path, stem: &str, dark: bool, scale: i32) {
         let path = asset_path(assets, stem, dark);
-        let size = 96 * scale;
-        match gdk_pixbuf::Pixbuf::from_file_at_size(&path, size, size) {
-            Ok(pb) => image.set_from_pixbuf(Some(&pb)),
-            Err(_) => image.set_from_file(Some(&path)),
+        let size = 96 * scale.max(1);
+        if path.extension().and_then(|e| e.to_str()) == Some("svg") {
+            if let Some(tex) = svg_to_texture(&path, size) {
+                image.set_from_paintable(Some(&tex));
+                return;
+            }
         }
+        image.set_from_file(Some(&path));
     }
 
     fn load_asset_image(assets: &std::path::Path, stem: &str, dark: bool) -> Image {
@@ -270,9 +292,14 @@ mod windows {
 
         let existing = existing_install();
 
+        let title = if is_uninstaller() {
+            format!("{APP_NAME} Uninstaller")
+        } else {
+            format!("{APP_NAME} Installer")
+        };
         let window = ApplicationWindow::builder()
             .application(app)
-            .title(APP_NAME)
+            .title(&title)
             .default_width(520)
             .default_height(400)
             .resizable(false)
@@ -830,8 +857,9 @@ mod windows {
                     let tmp_exe = tmp.join(self_exe.file_name().unwrap_or_default());
                     if tmp.exists() {
                         if locked_by_other_process(&tmp) {
+                            let name = format!("{APP_NAME} Uninstaller");
                             show_native_error(
-                                &gettext("%s is already running.").replacen("%s", APP_NAME, 1),
+                                &gettext("%s is already running.").replacen("%s", &name, 1),
                             );
                             return;
                         }

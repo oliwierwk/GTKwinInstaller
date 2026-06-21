@@ -48,7 +48,7 @@ mod windows {
 
             if tmp.exists() {
                 if is_locked(&tmp) {
-                    show_error(&format!("{APP_NAME} is already running."));
+                    show_error(&format!("{APP_NAME} Installer is already running."));
                     return;
                 }
                 let _ = std::fs::remove_dir_all(&tmp);

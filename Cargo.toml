@@ -13,6 +13,7 @@ dirs = "5"
 gettext-rs = { version = "0.7", features = ["gettext-system"] }
 
 libadwaita = { version = "0.7", features = ["v1_6"] }
+resvg = "0.44"
 
 [target.'cfg(windows)'.dependencies]
 zip = { version = "2", default-features = false, features = ["deflate"] }

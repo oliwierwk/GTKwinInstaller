@@ -7,7 +7,7 @@
 
 pub const APP_NAME: &str = match option_env!("GTKWIN_APP_NAME") {
     Some(v) => v,
-    None => "GTKwinInstaller", // display/brand name (free-form)
+    None => "MyApp", // display/brand name (free-form)
 };
 
 pub const PUBLISHER: &str = match option_env!("GTKWIN_PUBLISHER") {
@@ -32,7 +32,7 @@ pub const LICENSE_FILE: &str = match option_env!("GTKWIN_LICENSE_FILE") {
 /// Leave empty ("") to skip shortcuts and auto-launch.
 pub const APP_EXE: &str = match option_env!("GTKWIN_APP_EXE") {
     Some(v) => v,
-    None => "",
+    None => "MyApp.cmd",
 };
 
 /// When true, the dark variant of app-icon (app-icon-dark.svg/png) is used as
