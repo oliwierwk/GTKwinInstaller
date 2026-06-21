@@ -87,7 +87,7 @@ package-windows: | check-ucrt64
 
 	# gdk-pixbuf PNG + SVG loaders and their deps
 	mkdir -p $(DIST_WIN)/lib/gdk-pixbuf-2.0/2.10.0/loaders
-	for loader in libpixbufloader-png.dll libpixbufloader-svg.dll; do \
+	for loader in libpixbufloader-png.dll; do \
 	  cp /ucrt64/lib/gdk-pixbuf-2.0/2.10.0/loaders/$$loader \
 	     $(DIST_WIN)/lib/gdk-pixbuf-2.0/2.10.0/loaders/; \
 	  ldd /ucrt64/lib/gdk-pixbuf-2.0/2.10.0/loaders/$$loader \
