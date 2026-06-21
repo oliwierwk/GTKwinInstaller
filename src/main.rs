@@ -545,9 +545,9 @@ mod windows {
             let app_icon = app_icon.clone();
             let check_icon = check_icon.clone();
             let error_icon = error_icon.clone();
-            let style_manager = style_manager.clone();
+            let sm = style_manager.clone();
             let reload = move |scale: i32| {
-                let dark = style_manager.is_dark();
+                let dark = sm.is_dark();
                 set_asset_image(&app_icon,    &assets, "app-icon",        dark, scale);
                 set_asset_image(&check_icon,  &assets, "install-success", dark, scale);
                 set_asset_image(&error_icon,  &assets, "install-error",   dark, scale);
