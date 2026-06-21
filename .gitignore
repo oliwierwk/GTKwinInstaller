@@ -6,3 +6,6 @@
 
 /target
 /dist
+
+# Per-consumer config — lives outside the submodule in the parent repo
+installer.env

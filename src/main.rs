@@ -1,5 +1,6 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
+#[path = "../config.rs"]
 mod config;
 
 fn main() {
@@ -198,12 +199,21 @@ mod windows {
     }
 
     fn do_install(src: &Path, dest: &Path, desktop: bool, startmenu: bool) -> std::io::Result<()> {
-        // src/app/ is the designated payload directory — only its contents land in dest.
-        copy_dir(&src.join("app"), dest)?;
         if BUNDLED_UNINSTALLER {
+            copy_dir(&src.join("app"), dest)?;
             if let Ok(setup_path) = std::env::var("SETUP_EXE_PATH") {
                 let _ = std::fs::copy(setup_path, dest.join("uninstall.exe"));
             }
+        } else {
+            // Copy the full installer directory (DLLs, installer binary, app/) to dest,
+            // then flatten app/ into dest so app files sit alongside the GTK runtime.
+            copy_dir(src, dest)?;
+            let app_dir = dest.join("app");
+            for entry in std::fs::read_dir(&app_dir)? {
+                let entry = entry?;
+                std::fs::rename(entry.path(), dest.join(entry.file_name()))?;
+            }
+            std::fs::remove_dir(&app_dir)?;
         }
         write_registry(dest);
         let exe = dest.join(exe_name());
@@ -222,14 +232,23 @@ mod windows {
         Ok(())
     }
 
-    fn load_asset_image(assets: &std::path::Path, stem: &str) -> Image {
-        let svg = assets.join(format!("{stem}.svg"));
-        if svg.exists() { Image::from_file(svg) } else { Image::from_file(assets.join(format!("{stem}.png"))) }
+    fn asset_path(assets: &std::path::Path, stem: &str, dark: bool) -> std::path::PathBuf {
+        let candidates: &[&str] = if dark { &["-dark.svg", "-dark.png", ".svg", ".png"] }
+                                  else     { &[".svg", ".png"] };
+        candidates.iter()
+            .map(|s| assets.join(format!("{stem}{s}")))
+            .find(|p| p.exists())
+            .unwrap_or_else(|| assets.join(format!("{stem}.svg")))
+    }
+
+    fn load_asset_image(assets: &std::path::Path, stem: &str, dark: bool) -> Image {
+        Image::from_file(asset_path(assets, stem, dark))
     }
 
     fn build_ui(app: &adw::Application) {
         let src = std::env::current_exe().unwrap().parent().unwrap().to_path_buf();
         let assets = src.join("assets");
+        let style_manager = adw::StyleManager::default();
 
         let license_text: Option<String> = if !LICENSE_FILE.is_empty() {
             std::fs::read_to_string(src.join(LICENSE_FILE)).ok().filter(|s| !s.is_empty())
@@ -266,7 +285,7 @@ mod windows {
         wc.set_valign(gtk4::Align::Center);
         wc.set_halign(gtk4::Align::Center);
 
-        let app_icon = load_asset_image(&assets, "app-icon");
+        let app_icon = load_asset_image(&assets, "app-icon", style_manager.is_dark());
         app_icon.set_pixel_size(96);
         wc.append(&app_icon);
 
@@ -438,7 +457,7 @@ mod windows {
         cc.set_valign(gtk4::Align::Center);
         cc.set_halign(gtk4::Align::Center);
 
-        let check_icon = load_asset_image(&assets, "install-success");
+        let check_icon = load_asset_image(&assets, "install-success", style_manager.is_dark());
         check_icon.set_pixel_size(96);
         cc.append(&check_icon);
 
@@ -477,7 +496,7 @@ mod windows {
         efc.set_valign(gtk4::Align::Center);
         efc.set_halign(gtk4::Align::Center);
 
-        let error_icon = load_asset_image(&assets, "install-error");
+        let error_icon = load_asset_image(&assets, "install-error", style_manager.is_dark());
         error_icon.set_pixel_size(96);
         efc.append(&error_icon);
 
@@ -504,6 +523,20 @@ mod windows {
         failed_page.append(&efb);
 
         stack.add_named(&failed_page, Some("failed"));
+
+        // Update images when the system theme changes.
+        {
+            let assets = assets.clone();
+            let app_icon = app_icon.clone();
+            let check_icon = check_icon.clone();
+            let error_icon = error_icon.clone();
+            style_manager.connect_notify_local(Some("dark"), move |mgr, _| {
+                let dark = mgr.is_dark();
+                app_icon.set_from_file(Some(asset_path(&assets, "app-icon", dark)));
+                check_icon.set_from_file(Some(asset_path(&assets, "install-success", dark)));
+                error_icon.set_from_file(Some(asset_path(&assets, "install-error", dark)));
+            });
+        }
 
         // ── Uninstall ────────────────────────────────────────────────────────
         let uninstall_page = GtkBox::new(Orientation::Vertical, 0);
@@ -599,7 +632,6 @@ mod windows {
             let desktop_cb = desktop_cb.clone();
             let startmenu_cb = startmenu_cb.clone();
             let prev_btn = prev_btn.clone();
-            let window_weak = window.downgrade();
             let src = src.clone();
 
             install_btn.connect_clicked(move |btn| {

@@ -8,10 +8,14 @@ fn main() {
     let target_dir = Path::new(&out).ancestors().nth(3).unwrap().to_path_buf();
     let dest = target_dir.join("assets");
 
+    // ASSETS_DIR: overridable for submodule use (default: assets/)
+    println!("cargo:rerun-if-env-changed=ASSETS_DIR");
+    let assets_dir = env::var("ASSETS_DIR").unwrap_or_else(|_| "assets".into());
+
     if dest.exists() { fs::remove_dir_all(&dest).unwrap(); }
     fs::create_dir_all(&dest).unwrap();
 
-    for entry in fs::read_dir("assets").unwrap() {
+    for entry in fs::read_dir(&assets_dir).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
@@ -47,12 +51,33 @@ fn main() {
             writer.finish().unwrap();
         }
 
+        // Emit rerun-if-env-changed for every GTKWIN_* var (rustc tracks option_env!
+        // automatically, but being explicit ensures build.rs itself also reruns).
+        for var in &[
+            "GTKWIN_APP_NAME", "GTKWIN_PUBLISHER", "GTKWIN_APP_ID",
+            "GTKWIN_LICENSE_FILE", "GTKWIN_BUNDLED_UNINSTALLER", "GTKWIN_APP_ICON_DARK",
+        ] {
+            println!("cargo:rerun-if-env-changed={var}");
+        }
+
+        println!("cargo:rerun-if-changed=config.rs");
+        let config_src = fs::read_to_string("config.rs").unwrap_or_default();
+
+        // GTKWIN_APP_ICON_DARK env wins; fall back to config.rs constant
+        let icon_dark = match env::var("GTKWIN_APP_ICON_DARK") {
+            Ok(v) => v == "1" || v == "true",
+            Err(_) => config_src.contains("APP_ICON_DARK: bool = true"),
+        };
+        let icon_stem = if icon_dark { "app-icon-dark" } else { "app-icon" };
+
         let ico_path = Path::new(&out).join("app.ico");
-        if Path::new("assets/app-icon.svg").exists() {
-            println!("cargo:rerun-if-changed=assets/app-icon.svg");
-            let data = fs::read("assets/app-icon.svg").expect("failed to read app-icon.svg");
+        let svg_path = format!("{assets_dir}/{icon_stem}.svg");
+        let png_path = format!("{assets_dir}/{icon_stem}.png");
+        if Path::new(&svg_path).exists() {
+            println!("cargo:rerun-if-changed={svg_path}");
+            let data = fs::read(&svg_path).expect("failed to read app icon svg");
             let tree = resvg::usvg::Tree::from_data(&data, &resvg::usvg::Options::default())
-                .expect("failed to parse app-icon.svg");
+                .expect("failed to parse app icon svg");
             let mut pixmap = resvg::tiny_skia::Pixmap::new(256, 256).unwrap();
             let scale_x = 256.0 / tree.size().width();
             let scale_y = 256.0 / tree.size().height();
@@ -63,8 +88,8 @@ fn main() {
                 .save_with_format(&ico_path, image::ImageFormat::Ico)
                 .expect("failed to write ico");
         } else {
-            println!("cargo:rerun-if-changed=assets/app-icon.png");
-            let img = image::open("assets/app-icon.png").expect("assets/app-icon.svg or assets/app-icon.png required");
+            println!("cargo:rerun-if-changed={png_path}");
+            let img = image::open(&png_path).expect("assets/app-icon.svg or assets/app-icon.png required");
             img.resize(256, 256, image::imageops::FilterType::Lanczos3)
                 .save_with_format(&ico_path, image::ImageFormat::Ico)
                 .expect("failed to write ico");

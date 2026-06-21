@@ -5,6 +5,28 @@ DIST_WIN  := dist/windows
 ZIP       := dist/gtkwininstaller-windows.zip
 SETUP_EXE := dist/gtkwininstaller-setup.exe
 
+# ─── Per-consumer config ──────────────────────────────────────────────────────
+# Submodule users: copy installer.env.example → installer.env in the parent
+# repo, fill it in, then: make -C installer package-windows INSTALLER_ENV=../installer.env
+# Standalone users: edit config.rs and app/ directly; leave these defaults.
+INSTALLER_ENV ?= installer.env
+-include $(INSTALLER_ENV)
+
+APP_DIR    ?= app        # payload directory — contents go to the install destination
+ASSETS_DIR ?= assets     # installer branding assets (SVGs/PNGs)
+LICENSE    ?= app/LICENSE
+APP_BUILD  ?=            # optional command to build the app before staging
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Branding forwarded into cargo builds as env vars (only set if non-empty)
+CARGO_ENV = ASSETS_DIR='$(ASSETS_DIR)' \
+  $(if $(APP_NAME),GTKWIN_APP_NAME='$(APP_NAME)') \
+  $(if $(PUBLISHER),GTKWIN_PUBLISHER='$(PUBLISHER)') \
+  $(if $(APP_ID),GTKWIN_APP_ID='$(APP_ID)') \
+  $(if $(LICENSE_FILE),GTKWIN_LICENSE_FILE='$(LICENSE_FILE)') \
+  $(if $(BUNDLED_UNINSTALLER),GTKWIN_BUNDLED_UNINSTALLER='$(BUNDLED_UNINSTALLER)') \
+  $(if $(APP_ICON_DARK),GTKWIN_APP_ICON_DARK='$(APP_ICON_DARK)')
+
 .PHONY: all package package-windows build check-rust check-ucrt64 clean update-pot
 
 all: package
@@ -37,8 +59,9 @@ check-ucrt64: check-rust
 	    || { echo "error: missing $$pkg — run: pacman -S $$pkg"; exit 1; }; \
 	done
 
-package-windows: check-ucrt64
-	cargo build --release --bin $(BINARY)
+package-windows: | check-ucrt64
+	$(if $(APP_BUILD),$(APP_BUILD))
+	$(CARGO_ENV) cargo build --release --bin $(BINARY)
 	rm -rf $(DIST_WIN) && mkdir -p $(DIST_WIN)/share/glib-2.0
 
 	# Copy installer binary
@@ -57,7 +80,7 @@ package-windows: check-ucrt64
 	cp -r /ucrt64/share/icons/Adwaita $(DIST_WIN)/share/icons/
 	glib-compile-schemas $(DIST_WIN)/share/glib-2.0/schemas/
 
-	# Installer assets (PNGs)
+	# Installer assets
 	cp -r $(RELEASE)/assets $(DIST_WIN)/
 
 	# gdk-pixbuf PNG + SVG loaders and their deps
@@ -70,14 +93,13 @@ package-windows: check-ucrt64
 	done
 
 	# ── Target app payload ────────────────────────────────────────────────────
-	# Drop your app's files into app/ — only this directory is copied to the
-	# install destination. The GTK runtime above is installer-only.
-	mkdir -p $(DIST_WIN)/app
-	# cp -r my-app.exe ... $(DIST_WIN)/app/
+	# Standalone: drop your app's files in app/ at the repo root.
+	# Submodule:  set APP_DIR in installer.env to point at your build output.
+	cp -r $(APP_DIR) $(DIST_WIN)/app
 	# ─────────────────────────────────────────────────────────────────────────
 
-	# License file shown to the user during installation (optional)
-	# cp LICENSE $(DIST_WIN)/LICENSE
+	# License shown during installation (optional)
+	[ -f $(LICENSE) ] && cp $(LICENSE) $(DIST_WIN)/LICENSE || true
 
 	# Translations
 	for po in po/*.po; do \
@@ -90,8 +112,12 @@ package-windows: check-ucrt64
 	rm -f $(ZIP)
 	cd $(DIST_WIN) && zip -r ../../$(ZIP) .
 
+	# Build self-extracting installer
+	BUNDLE_ZIP=$(ZIP) $(CARGO_ENV) cargo build --release --bin setup
+	cp $(RELEASE)/setup.exe $(SETUP_EXE)
+
 $(SETUP_EXE): $(ZIP)
-	BUNDLE_ZIP=$(ZIP) cargo build --release --bin setup
+	BUNDLE_ZIP=$(ZIP) $(CARGO_ENV) cargo build --release --bin setup
 	cp $(RELEASE)/setup.exe $(SETUP_EXE)
 
 # ─── Shared ───────────────────────────────────────────────────────────────────

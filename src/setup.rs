@@ -1,5 +1,6 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
+#[path = "../config.rs"]
 mod config;
 
 fn main() {
