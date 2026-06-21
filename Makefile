@@ -25,7 +25,8 @@ CARGO_ENV = ASSETS_DIR='$(ASSETS_DIR)' \
   $(if $(APP_ID),GTKWIN_APP_ID='$(APP_ID)') \
   $(if $(LICENSE_FILE),GTKWIN_LICENSE_FILE='$(LICENSE_FILE)') \
   $(if $(BUNDLED_UNINSTALLER),GTKWIN_BUNDLED_UNINSTALLER='$(BUNDLED_UNINSTALLER)') \
-  $(if $(APP_ICON_DARK),GTKWIN_APP_ICON_DARK='$(APP_ICON_DARK)')
+  $(if $(APP_ICON_DARK),GTKWIN_APP_ICON_DARK='$(APP_ICON_DARK)') \
+  $(if $(APP_EXE),GTKWIN_APP_EXE='$(APP_EXE)')
 
 .PHONY: all package package-windows build check-rust check-ucrt64 clean update-pot
 
@@ -64,8 +65,8 @@ package-windows: | check-ucrt64
 	$(CARGO_ENV) cargo build --release --bin $(BINARY)
 	rm -rf $(DIST_WIN) && mkdir -p $(DIST_WIN)/share/glib-2.0
 
-	# Copy installer binary
-	cp $(RELEASE)/$(BINARY).exe $(DIST_WIN)/
+	# Copy installer binary (fixed name so setup.rs can find it)
+	cp $(RELEASE)/$(BINARY).exe $(DIST_WIN)/installer.exe
 
 	# Gather DLL dependencies
 	ldd $(RELEASE)/$(BINARY).exe \

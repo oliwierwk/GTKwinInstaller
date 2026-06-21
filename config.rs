@@ -27,6 +27,14 @@ pub const LICENSE_FILE: &str = match option_env!("GTKWIN_LICENSE_FILE") {
     None => "LICENSE",
 };
 
+/// Filename of the user's app executable in the install directory.
+/// Used to create desktop/start-menu shortcuts and to launch the app after "Finish".
+/// Leave empty ("") to skip shortcuts and auto-launch.
+pub const APP_EXE: &str = match option_env!("GTKWIN_APP_EXE") {
+    Some(v) => v,
+    None => "",
+};
+
 /// When true, the dark variant of app-icon (app-icon-dark.svg/png) is used as
 /// the embedded Windows application icon (.ico). Has no effect at runtime —
 /// only changes the icon baked into the binary at build time.

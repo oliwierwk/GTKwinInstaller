@@ -10,7 +10,7 @@ fn main() {
 
 #[cfg(windows)]
 mod windows {
-    use super::config::{APP_NAME, exe_name};
+    use super::config::APP_NAME;
     use std::path::PathBuf;
 
     #[cfg(bundled)]
@@ -31,7 +31,7 @@ mod windows {
     }
 
     fn is_locked(dir: &std::path::Path) -> bool {
-        let exe = dir.join(exe_name());
+        let exe = dir.join("installer.exe");
         exe.exists() && std::fs::OpenOptions::new().write(true).open(&exe).is_err()
     }
 
@@ -58,7 +58,7 @@ mod windows {
             let mut archive = zip::ZipArchive::new(Cursor::new(BUNDLE)).unwrap();
             archive.extract(&tmp).unwrap();
 
-            let installer = tmp.join(exe_name());
+            let installer = tmp.join("installer.exe");
             let _ = std::process::Command::new(&installer)
                 .current_dir(&tmp)
                 .env("SETUP_EXE_PATH", std::env::current_exe().unwrap_or_default())

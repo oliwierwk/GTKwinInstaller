@@ -10,7 +10,7 @@ fn main() {
 
 #[cfg(windows)]
 mod windows {
-    use super::config::{APP_ID, APP_NAME, BUNDLED_UNINSTALLER, LICENSE_FILE, PUBLISHER, exe_name, reg_key};
+    use super::config::{APP_EXE, APP_ID, APP_NAME, BUNDLED_UNINSTALLER, LICENSE_FILE, PUBLISHER, reg_key};
     use std::os::windows::process::CommandExt;
     use std::path::{Path, PathBuf};
     use winreg::enums::*;
@@ -20,6 +20,7 @@ mod windows {
         ApplicationWindow, Box as GtkBox, Button, CheckButton, Entry, FileDialog,
         HeaderBar, Image, Label, Orientation, ScrolledWindow, Separator, Stack,
         StackTransitionType, AlertDialog, TextView, WrapMode, gio, glib,
+        gdk_pixbuf,
     };
     use libadwaita as adw;
     use gettextrs::gettext;
@@ -210,20 +211,22 @@ mod windows {
                 std::fs::rename(entry.path(), dest.join(entry.file_name()))?;
             }
             std::fs::remove_dir(&app_dir)?;
-            std::fs::rename(dest.join(exe_name()), dest.join("uninstaller.exe"))?;
+            std::fs::rename(dest.join("installer.exe"), dest.join("uninstaller.exe"))?;
         }
         write_registry(dest);
-        let exe = dest.join(exe_name());
-        if desktop {
-            if let Some(d) = dirs::desktop_dir() {
-                create_shortcut(&exe, &d.join(format!("{APP_NAME}.lnk")));
+        if !APP_EXE.is_empty() {
+            let exe = dest.join(APP_EXE);
+            if desktop {
+                if let Some(d) = dirs::desktop_dir() {
+                    create_shortcut(&exe, &d.join(format!("{APP_NAME}.lnk")));
+                }
             }
-        }
-        if startmenu {
-            if let Some(data) = dirs::data_dir() {
-                let programs = data.join("Microsoft\\Windows\\Start Menu\\Programs");
-                let _ = std::fs::create_dir_all(&programs);
-                create_shortcut(&exe, &programs.join(format!("{APP_NAME}.lnk")));
+            if startmenu {
+                if let Some(data) = dirs::data_dir() {
+                    let programs = data.join("Microsoft\\Windows\\Start Menu\\Programs");
+                    let _ = std::fs::create_dir_all(&programs);
+                    create_shortcut(&exe, &programs.join(format!("{APP_NAME}.lnk")));
+                }
             }
         }
         Ok(())
@@ -238,8 +241,19 @@ mod windows {
             .unwrap_or_else(|| assets.join(format!("{stem}.svg")))
     }
 
+    fn set_asset_image(image: &Image, assets: &std::path::Path, stem: &str, dark: bool, scale: i32) {
+        let path = asset_path(assets, stem, dark);
+        let size = 96 * scale;
+        match gdk_pixbuf::Pixbuf::from_file_at_size(&path, size, size) {
+            Ok(pb) => image.set_from_pixbuf(Some(&pb)),
+            Err(_) => image.set_from_file(Some(&path)),
+        }
+    }
+
     fn load_asset_image(assets: &std::path::Path, stem: &str, dark: bool) -> Image {
-        Image::from_file(asset_path(assets, stem, dark))
+        let image = Image::new();
+        set_asset_image(&image, assets, stem, dark, 1);
+        image
     }
 
     fn build_ui(app: &adw::Application) {
@@ -525,17 +539,33 @@ mod windows {
         stack.add_named(&failed_page, Some("failed"));
 
         // Update images when the system theme changes.
+        // Reload images at the correct scale whenever theme or monitor scale changes.
         {
             let assets = assets.clone();
             let app_icon = app_icon.clone();
             let check_icon = check_icon.clone();
             let error_icon = error_icon.clone();
-            style_manager.connect_notify_local(Some("dark"), move |mgr, _| {
-                let dark = mgr.is_dark();
-                app_icon.set_from_file(Some(asset_path(&assets, "app-icon", dark)));
-                check_icon.set_from_file(Some(asset_path(&assets, "install-success", dark)));
-                error_icon.set_from_file(Some(asset_path(&assets, "install-error", dark)));
+            let style_manager = style_manager.clone();
+            let reload = move |scale: i32| {
+                let dark = style_manager.is_dark();
+                set_asset_image(&app_icon,    &assets, "app-icon",        dark, scale);
+                set_asset_image(&check_icon,  &assets, "install-success", dark, scale);
+                set_asset_image(&error_icon,  &assets, "install-error",   dark, scale);
+            };
+            let reload = std::rc::Rc::new(reload);
+            let window_weak = window.downgrade();
+
+            let r = reload.clone();
+            let w = window_weak.clone();
+            style_manager.connect_notify_local(Some("dark"), move |_, _| {
+                r(w.upgrade().map(|w| w.scale_factor()).unwrap_or(1));
             });
+
+            let r = reload.clone();
+            window.connect_realize(move |win| r(win.scale_factor()));
+
+            let r = reload.clone();
+            window.connect_notify_local(Some("scale-factor"), move |win, _| r(win.scale_factor()));
         }
 
         // ── Uninstall ────────────────────────────────────────────────────────
@@ -772,9 +802,11 @@ mod windows {
             let window_weak = window.downgrade();
             finish_btn.connect_clicked(move |_| {
                 let dest = PathBuf::from(entry.text().as_str());
-                let _ = std::process::Command::new(dest.join(exe_name()))
-                    .current_dir(&dest)
-                    .spawn();
+                if !APP_EXE.is_empty() {
+                    let _ = std::process::Command::new(dest.join(APP_EXE))
+                        .current_dir(&dest)
+                        .spawn();
+                }
                 if let Some(win) = window_weak.upgrade() {
                     win.close();
                 }
@@ -795,7 +827,7 @@ mod windows {
             if let Some(install_dir) = existing_install() {
                 if self_exe.starts_with(&install_dir) {
                     let tmp = temp_installer_dir();
-                    let tmp_exe = tmp.join(exe_name());
+                    let tmp_exe = tmp.join(self_exe.file_name().unwrap_or_default());
                     if tmp.exists() {
                         if locked_by_other_process(&tmp) {
                             show_native_error(
