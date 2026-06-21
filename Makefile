@@ -16,6 +16,7 @@ APP_DIR    ?= app
 ASSETS_DIR ?= assets
 LICENSE    ?= app/LICENSE
 APP_BUILD  ?=
+SVG_FEATURE := $(if $(wildcard $(ASSETS_DIR)/*.svg),--features svg,)
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Branding forwarded into cargo builds as env vars (only set if non-empty)
@@ -62,7 +63,7 @@ check-ucrt64: check-rust
 
 package-windows: | check-ucrt64
 	$(if $(APP_BUILD),$(APP_BUILD))
-	$(CARGO_ENV) cargo build --release --bin $(BINARY)
+	$(CARGO_ENV) cargo build --release --bin $(BINARY) $(SVG_FEATURE)
 	rm -rf $(DIST_WIN) && mkdir -p $(DIST_WIN)/share/glib-2.0
 
 	# Copy installer binary (fixed name so setup.rs can find it)

@@ -15,14 +15,18 @@ fn main() {
     if dest.exists() { fs::remove_dir_all(&dest).unwrap(); }
     fs::create_dir_all(&dest).unwrap();
 
+    println!("cargo:rustc-check-cfg=cfg(has_svg_assets)");
+    let mut has_svg = false;
     for entry in fs::read_dir(&assets_dir).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         if !matches!(ext, "png" | "svg") { continue; }
+        if ext == "svg" { has_svg = true; }
         println!("cargo:rerun-if-changed={}", path.display());
         fs::copy(&path, dest.join(entry.file_name())).unwrap();
     }
+    if has_svg { println!("cargo:rustc-cfg=has_svg_assets"); }
 
     #[cfg(target_os = "windows")]
     {

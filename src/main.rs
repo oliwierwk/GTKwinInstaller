@@ -247,6 +247,7 @@ mod windows {
             .unwrap_or_else(|| assets.join(format!("{stem}.svg")))
     }
 
+    #[cfg(all(feature = "svg", has_svg_assets))]
     fn svg_to_texture(path: &std::path::Path, size: i32) -> Option<gdk::Texture> {
         let data = std::fs::read(path).ok()?;
         let tree = resvg::usvg::Tree::from_data(&data, &resvg::usvg::Options::default()).ok()?;
@@ -263,6 +264,7 @@ mod windows {
     fn set_asset_image(image: &Image, assets: &std::path::Path, stem: &str, dark: bool, scale: i32) {
         let path = asset_path(assets, stem, dark);
         let size = 96 * scale.max(1);
+        #[cfg(all(feature = "svg", has_svg_assets))]
         if path.extension().and_then(|e| e.to_str()) == Some("svg") {
             if let Some(tex) = svg_to_texture(&path, size) {
                 image.set_paintable(Some(&tex));
@@ -291,8 +293,9 @@ mod windows {
         let has_license = license_text.is_some();
 
         let existing = existing_install();
+        let uninstaller = is_uninstaller();
 
-        let title = if is_uninstaller() {
+        let title = if uninstaller {
             format!("{APP_NAME} Uninstaller")
         } else {
             format!("{APP_NAME} Installer")
@@ -607,9 +610,11 @@ mod windows {
         uc.set_valign(gtk4::Align::Center);
         uc.set_halign(gtk4::Align::Center);
 
-        let already_label = Label::new(Some(
-            &gettext("%s is already installed").replacen("%s", APP_NAME, 1),
-        ));
+        let already_label = Label::new(Some(&if uninstaller {
+            gettext("Uninstall %s?").replacen("%s", APP_NAME, 1)
+        } else {
+            gettext("%s is already installed").replacen("%s", APP_NAME, 1)
+        }));
         already_label.add_css_class("title-2");
         uc.append(&already_label);
 
