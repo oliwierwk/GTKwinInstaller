@@ -265,7 +265,7 @@ mod windows {
         let size = 96 * scale.max(1);
         if path.extension().and_then(|e| e.to_str()) == Some("svg") {
             if let Some(tex) = svg_to_texture(&path, size) {
-                image.set_from_paintable(Some(&tex));
+                image.set_paintable(Some(&tex));
                 return;
             }
         }
