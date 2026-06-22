@@ -95,9 +95,14 @@ package-windows: | check-ucrt64
 	done
 
 	# ── Target app payload ────────────────────────────────────────────────────
-	# Standalone: drop your app's files in app/ at the repo root.
-	# Submodule:  set APP_DIR in installer.env to point at your build output.
+	# Bundled: app goes in app/ subdir (uninstaller is setup.exe, no GTK needed).
+	# Non-bundled: app merged into archive root alongside GTK runtime — one set
+	# of DLLs. App files overwrite installer's on conflict (same MSYS2 build).
+ifeq ($(BUNDLED_UNINSTALLER),true)
 	cp -r $(APP_DIR) $(DIST_WIN)/app
+else
+	cp -rT $(APP_DIR) $(DIST_WIN)/
+endif
 	# ─────────────────────────────────────────────────────────────────────────
 
 	# License shown during installation (optional)
