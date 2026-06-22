@@ -16,6 +16,7 @@ APP_DIR    ?= app
 ASSETS_DIR ?= assets
 LICENSE    ?= app/LICENSE
 APP_BUILD  ?=
+PO_DIR     ?=
 SVG_FEATURE := $(if $(wildcard $(ASSETS_DIR)/*.svg),--features svg,)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -108,12 +109,17 @@ endif
 	# License shown during installation (optional)
 	[ -f $(LICENSE) ] && cp $(LICENSE) $(DIST_WIN)/LICENSE || true
 
-	# Translations
+	# Built-in translations; PO_DIR overrides per-language if set
 	for po in po/*.po; do \
 	  lang=$$(basename "$$po" .po); \
 	  mkdir -p $(DIST_WIN)/share/locale/$$lang/LC_MESSAGES; \
 	  msgfmt -o $(DIST_WIN)/share/locale/$$lang/LC_MESSAGES/gtkwininstaller.mo "$$po"; \
 	done
+	$(if $(PO_DIR),for po in $(PO_DIR)/*.po; do \
+	  lang=$$(basename "$$po" .po); \
+	  mkdir -p $(DIST_WIN)/share/locale/$$lang/LC_MESSAGES; \
+	  msgfmt -o $(DIST_WIN)/share/locale/$$lang/LC_MESSAGES/gtkwininstaller.mo "$$po"; \
+	done)
 
 	# Pack portable ZIP
 	rm -f $(ZIP)
