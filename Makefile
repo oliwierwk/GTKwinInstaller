@@ -23,6 +23,7 @@ SVG_FEATURE := $(if $(wildcard $(ASSETS_DIR)/*.svg),--features svg,)
 # Branding forwarded into cargo builds as env vars (only set if non-empty)
 CARGO_ENV = ASSETS_DIR='$(ASSETS_DIR)' \
   $(if $(APP_NAME),GTKWIN_APP_NAME='$(APP_NAME)') \
+  $(if $(APP_DESCRIPTION),GTKWIN_APP_DESCRIPTION='$(APP_DESCRIPTION)') \
   $(if $(PUBLISHER),GTKWIN_PUBLISHER='$(PUBLISHER)') \
   $(if $(APP_ID),GTKWIN_APP_ID='$(APP_ID)') \
   $(if $(LICENSE_FILE),GTKWIN_LICENSE_FILE='$(LICENSE_FILE)') \
