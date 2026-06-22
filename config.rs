@@ -10,6 +10,14 @@ pub const APP_NAME: &str = match option_env!("GTKWIN_APP_NAME") {
     None => "MyApp", // display/brand name (free-form)
 };
 
+/// One-line description shown as subtitle on the installer welcome page.
+/// Not translated — provide it in whatever language you want displayed.
+/// Leave empty ("") to show the default translatable description instead.
+pub const APP_DESCRIPTION: &str = match option_env!("GTKWIN_APP_DESCRIPTION") {
+    Some(v) => v,
+    None => "",
+};
+
 pub const PUBLISHER: &str = match option_env!("GTKWIN_PUBLISHER") {
     Some(v) => v,
     None => "GTKwinInstaller", // Add/Remove Programs publisher

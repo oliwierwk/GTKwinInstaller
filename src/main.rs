@@ -10,7 +10,7 @@ fn main() {
 
 #[cfg(windows)]
 mod windows {
-    use super::config::{APP_EXE, APP_ID, APP_NAME, BUNDLED_UNINSTALLER, LICENSE_FILE, PUBLISHER, reg_key};
+    use super::config::{APP_DESCRIPTION, APP_EXE, APP_ID, APP_NAME, BUNDLED_UNINSTALLER, LICENSE_FILE, PUBLISHER, reg_key};
     use std::os::windows::process::CommandExt;
     use std::path::{Path, PathBuf};
     use winreg::enums::*;
@@ -339,7 +339,12 @@ fn create_shortcut(target: &Path, lnk: &Path) {
         title.add_css_class("title-1");
         wc.append(&title);
 
-        let subtitle = Label::new(Some(&gettext("A GTK-based Windows installer")));
+        let subtitle_str = if APP_DESCRIPTION.is_empty() {
+            gettext("A GTK-based Windows installer")
+        } else {
+            gettext(APP_DESCRIPTION)
+        };
+        let subtitle = Label::new(Some(&subtitle_str));
         subtitle.add_css_class("dim-label");
         wc.append(&subtitle);
 

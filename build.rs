@@ -58,7 +58,7 @@ fn main() {
         // Emit rerun-if-env-changed for every GTKWIN_* var (rustc tracks option_env!
         // automatically, but being explicit ensures build.rs itself also reruns).
         for var in &[
-            "GTKWIN_APP_NAME", "GTKWIN_PUBLISHER", "GTKWIN_APP_ID",
+            "GTKWIN_APP_NAME", "GTKWIN_APP_DESCRIPTION", "GTKWIN_PUBLISHER", "GTKWIN_APP_ID",
             "GTKWIN_LICENSE_FILE", "GTKWIN_BUNDLED_UNINSTALLER", "GTKWIN_APP_ICON_DARK",
             "GTKWIN_APP_EXE",
         ] {
