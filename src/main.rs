@@ -71,6 +71,21 @@ mod windows {
         Ok(())
     }
 
+    // Like copy_dir but skips files that already exist at the destination.
+    fn copy_dir_fill(src: &Path, dst: &Path) -> std::io::Result<()> {
+        std::fs::create_dir_all(dst)?;
+        for entry in std::fs::read_dir(src)? {
+            let entry = entry?;
+            let dst_path = dst.join(entry.file_name());
+            if entry.file_type()?.is_dir() {
+                copy_dir_fill(&entry.path(), &dst_path)?;
+            } else if !dst_path.exists() {
+                std::fs::copy(entry.path(), dst_path)?;
+            }
+        }
+        Ok(())
+    }
+
     fn create_shortcut(target: &Path, lnk: &Path) {
         let t = target.to_string_lossy().replace('\'', "''");
         let l = lnk.to_string_lossy().replace('\'', "''");
@@ -208,16 +223,37 @@ mod windows {
                 let _ = std::fs::copy(setup_path, dest.join("uninstaller.exe"));
             }
         } else {
-            // Copy the full installer directory (DLLs, installer binary, app/) to dest,
-            // then flatten app/ into dest so app files sit alongside the GTK runtime.
-            copy_dir(src, dest)?;
-            let app_dir = dest.join("app");
-            for entry in std::fs::read_dir(&app_dir)? {
+            // Non-bundled hybrid install: user's GTK app provides the runtime.
+            // 1. Copy app payload (may already include GTK DLLs).
+            copy_dir(&src.join("app"), dest)?;
+            // 2. Copy root DLLs from the installer, skipping any already present
+            //    with the same file size (same version = no doubling needed).
+            //    If sizes differ the installer's version wins so the uninstaller
+            //    runs against the GTK it was compiled with.
+            for entry in std::fs::read_dir(src)? {
                 let entry = entry?;
-                std::fs::rename(entry.path(), dest.join(entry.file_name()))?;
+                let path = entry.path();
+                if entry.file_type()?.is_dir() { continue; }
+                let fname = entry.file_name();
+                if fname == std::ffi::OsStr::new("installer.exe") { continue; }
+                if path.extension().and_then(|e| e.to_str()) == Some("dll") {
+                    let dst_path = dest.join(&fname);
+                    if dst_path.exists() {
+                        let src_sz = std::fs::metadata(&path)?.len();
+                        let dst_sz = std::fs::metadata(&dst_path)?.len();
+                        if src_sz == dst_sz { continue; }
+                    }
+                    std::fs::copy(&path, dest.join(&fname))?;
+                }
             }
-            std::fs::remove_dir(&app_dir)?;
-            std::fs::rename(dest.join("installer.exe"), dest.join("uninstaller.exe"))?;
+            // 3. Installer assets (UI images) always written.
+            copy_dir(&src.join("assets"), &dest.join("assets"))?;
+            // 4. GTK runtime data: fill-only so app's loaders.cache / schemas are kept.
+            for sub in &["share", "lib"] {
+                let sub_src = src.join(sub);
+                if sub_src.exists() { copy_dir_fill(&sub_src, &dest.join(sub))?; }
+            }
+            std::fs::copy(src.join("installer.exe"), dest.join("uninstaller.exe"))?;
         }
         write_registry(dest);
         if !APP_EXE.is_empty() {
